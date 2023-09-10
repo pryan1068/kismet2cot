@@ -1,0 +1,3 @@
+pytak
+cryptographywebsockets
+requests
