@@ -1,3 +1,4 @@
 pytak
-cryptographywebsockets
+cryptography
+websockets
 requests
