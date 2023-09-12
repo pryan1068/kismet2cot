@@ -10,7 +10,7 @@ class PyTAK:
     class MySender(pytak.QueueWorker):
         async def handle_data(self, data):
             # Output the cot data in PyTAK's queue
-            self._logger.info("pytak-out:%s", data)
+            self._logger.debug("pytak-out:%s", data)
             await self.put_queue(data)
 
         async def run(self, number_of_iterations=-1):
@@ -22,7 +22,7 @@ class PyTAK:
     # Copy data to the cotqueue
     class MyReceiver(pytak.QueueWorker):
         async def handle_data(self, data):
-            self._logger.info("pytak-in:%s")
+            self._logger.debug("pytak-in:%s")
 
             # Input the cot data onto the cotqueue
             await self.config.cotqueue.put(data)
