@@ -43,6 +43,10 @@ class KismetPlugin:
                 "Cookie":f"KISMET={kismetCookie}"
             }
 
+            # NOTE: Below is a filtered list of what data kismet should send. 
+            # If we received every piece of data, it would overwhelm comms and we
+            # would end up dropping network packets. So only request what you need.
+            # See the kismet2cot() function below where this data is used.
             devicesRequest = "ws://localhost:2501/devices/monitor.ws"
             req = {
                 "monitor": "*",
@@ -89,8 +93,10 @@ async def kismet2cot(data):
     obj = json.loads(data)
     # print("obj=", obj)
 
+    # NOTE: If you want to use other data from kismet, you need to add those to the filter
+    # that is defined in the run() method above.
     name=get('kismet.device.base.name', obj, "UNK")
-    geopoint=get('kismet.common.location.geopoint', obj, {"0.0", "0.0"})
+    geopoint=get('kismet.common.location.geopoint', obj, ["0.0", "0.0"])
     alt=get('kismet.common.location.alt', obj, "0")
     heading=get('kismet.common.location.heading', obj, "0")
     manf=get('kismet.device.base.manuf', obj, "UNK")
@@ -116,9 +122,11 @@ async def kismet2cot(data):
 
     point = ET.SubElement(event, "point")
     if len(geopoint) == 1:
+        print("ONE")
         point.set("lat", "0.0")
         point.set("lon", "0.0")
     else:
+        print("TWO")
         point.set("lat", list(geopoint)[0])
         point.set("lon", list(geopoint)[1])
 
