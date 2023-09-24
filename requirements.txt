@@ -1,4 +1,4 @@
-pytak
+pytak[with_takproto]
 cryptography
 websockets
 requests

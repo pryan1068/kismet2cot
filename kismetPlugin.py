@@ -11,8 +11,8 @@ import xml.etree.ElementTree as ET
 import takproto
 
 # Kismet user and password that you assigned the first time you ran it
-USER='user'
-PW='password'
+USER='pryan'
+PW='beanhead'
 
 basenameKey="kismet.device.base.name"
 basenameAlias="device.name"
@@ -167,9 +167,8 @@ async def kismet2cot(data):
     detail = ET.SubElement(event, "detail")
     contact = ET.SubElement(detail, "contact")
     contact.set("callsign", "hopper")
-    contact.set("endpoint", "192.168.0.46:4242:tcp")
-
-# <contact callsign='Eliopoli HQ' endpoint='192.168.1.10:4242:tcp'/>
+    contact.set("endpoint", "192.168.0.20:4242:tcp")
+    # <contact callsign='Eliopoli HQ' endpoint='192.168.1.10:4242:tcp'/>
 
 
     # emitter = ET.SubElement(detail, "emitter")
@@ -179,8 +178,10 @@ async def kismet2cot(data):
     # emitter.set("Mac", macAddr)
 
     # print(ET.dump(event))
+    # ET.dump(event)
 
-    buf = takproto.xml2proto(ET.tostring(event))
+    # buf = takproto.xml2proto(ET.tostring(event))
+    buf = ET.tostring(event)
 
     return buf
 
