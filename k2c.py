@@ -4,6 +4,7 @@ import asyncio
 import pytak
 from configparser import ConfigParser
 
+from multicast import CoTMulticast
 from stdioPlugin import StdioPlugin
 from kismetPlugin import KismetPlugin
 from pytakPlugin import PyTAK
@@ -14,27 +15,14 @@ cotqueue = asyncio.Queue()
 
 async def main():
     # Enable this to see websockets debug output
-    # logger = logging.getLogger('websockets')
+    # logger = logging.getLogger('pytak')
     # logger.setLevel(logging.DEBUG)
     # logger.addHandler(logging.StreamHandler())
 
+    # config.ini contains configuration settings
     parser = ConfigParser()
     parser.read("config.ini")
-
-    # print("sections=", parser.sections())
-    # for i in parser.sections():
-    #     print("section=", i)
-    # for i in parser.keys():
-    #     print("key=", i)
-    # for i in parser.values():
-    #     print("value=", i)
-
-    # print("mycottool=", parser["mycottool"]["COT_URL"])
-
-    # config["mycottool"] = {"COT_URL": "tcp://192.168.0.20:4242"}
-    # parser["mycottool"] = {"COT_URL": "udp://239.2.3.1:6969"}
     config = parser["mycottool"]
-    print("config=", config)
 
     # store cotqueue in config for all the plugins to use
     config.cotqueue = cotqueue
@@ -43,6 +31,8 @@ async def main():
     clitool = pytak.CLITool(config)
     await clitool.setup()
 
+    cotMulticast = CoTMulticast(clitool.tx_queue)
+ 
     clitool.add_tasks(
         set([
             # NOTE: ONLY ENABLE 1 SENDER and 1 RECEIVER
@@ -53,8 +43,9 @@ async def main():
             KismetPlugin.MyReceiver(clitool.rx_queue, config),
             
             # SENDERS:
-            PyTAK.MySender(clitool.tx_queue, config),
-            # StdioPlugin.MySender(clitool.tx_queue, config),
+            # PyTAK.MySender(clitool.tx_queue, config),
+            StdioPlugin.MySender(clitool.tx_queue, config),
+            # asyncio.create_task(cotMulticast.mainLoop())
             ])
     )
     

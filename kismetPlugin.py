@@ -1,5 +1,6 @@
 import asyncio
 import pytak
+from datetime import datetime
 import time
 
 # kismet imports
@@ -8,11 +9,20 @@ import json
 import requests
 from requests.auth import HTTPBasicAuth
 import xml.etree.ElementTree as ET
-import takproto
+from typing import Optional
 
-# Kismet user and password that you assigned the first time you ran it
-USER='pryan'
-PW='beanhead'
+import takproto
+from takproto.constants import (
+    ISO_8601_UTC,
+    DEFAULT_MESH_HEADER,
+    DEFAULT_PROTO_HEADER,
+    TAKProtoVer,
+)
+from takproto.proto import TakMessage
+import delimited_protobuf as dpb
+from io import BytesIO
+
+from multicast import CoTMulticast
 
 basenameKey="kismet.device.base.name"
 basenameAlias="device.name"
@@ -44,7 +54,10 @@ class KismetPlugin:
             r = None
             while r == None:
                 try:
-                    basic = HTTPBasicAuth(USER, PW)
+                    # Kismet user and password that you assigned the first time you ran it
+                    KISMET_USER = self.config["KISMET_USER"]
+                    KISMET_PASSWORD = self.config["KISMET_PASSWORD"]
+                    basic = HTTPBasicAuth(KISMET_USER, KISMET_PASSWORD)
                     url = 'http://localhost:2501/session/check_session'
                     r = requests.get(url, auth=basic)
 
@@ -85,6 +98,7 @@ class KismetPlugin:
             }
 
             try:
+                mc = CoTMulticast(asyncio.Queue())
                 async with websockets.connect(devicesRequest, extra_headers=myheaders) as websocket:
                     self._logger.debug("open=%s", websocket.open)
                     self._logger.debug("request_headers=%s", websocket.request_headers)
@@ -94,23 +108,111 @@ class KismetPlugin:
                     await websocket.send(json.dumps(req));
 
                     async for data in websocket:
-                        # self._logger.debug("data(kismet)=%s", data)
+                        self._logger.debug("data(kismet)=%s", data)
 
                         # convert the kismet data into cot
                         data = await kismet2cot(data)
-
-                        # self._logger.debug("data(cot)=%s", data)
+                        self._logger.info("data(cot)=%s", data)
+                        mc.send(data)
                         
                         # Input the cot data onto the cotqueue
                         await self.config.cotqueue.put(data)
             except websockets.exceptions.InvalidStatusCode as code:
-                # print('code=', code.status_code)
+                print('code=', code.status_code)
                 if code.status_code == 401:
                     print("======================================================================")
-                    print(f"Verify username({USER}) and password({PW}) are matching in kismet")
+                    print(f"Verify username({KISMET_USER}) and password({KISMET_PASSWORD}) are matching in kismet")
                     print("======================================================================")
 
 async def kismet2cot(data):
+    # Get the data from kismet
+    obj = json.loads(data)
+    name=get(basenameAlias, obj, "UNK")
+
+    lat=0.0
+    lon=0.0
+
+    if lastGeopointAlias in obj:
+        geopoint = obj[lastGeopointAlias]
+        if geopoint==None or geopoint==0:
+            lat = 0.0
+            lon = 0.0
+        else:
+            lat = float(geopoint[1])
+            lon = float(geopoint[0])
+
+    alt=get(altAlias, obj, "0")
+    # heading=get(headingAlias, obj, "0")
+    manf=get(manufAlias, obj, "UNK")
+    ssid=get(ssidAlias, obj, "UNK")
+    rssi=get(rssiAlias, obj, "0")
+    macAddr=get(macAddrAlias, obj, "0")
+
+    # Populate the CoT event
+    tak_message = TakMessage()
+    # tak_control = tak_message.takControl
+    # tak_control.contactUid = "uid"
+    new_event = tak_message.cotEvent
+    setattr(new_event, "type", "a-u-G")
+    # setattr(new_event, "access", "m-g")
+    # setattr(new_event, "qos", "m-g")
+    # setattr(new_event, "opex", "m-g")
+    setattr(new_event, "uid", name)
+    setattr(new_event, "how", "m-g")
+    setattr(new_event, "sendTime", format_time(pytak.cot_time()))
+    setattr(new_event, "startTime", format_time(pytak.cot_time()))
+    setattr(new_event, "staleTime", format_time(pytak.cot_time(3600)))
+    setattr(new_event, "lat", lat)
+    setattr(new_event, "lon", lon)
+    setattr(new_event, "hae", 1.0)
+    setattr(new_event, "ce", 999999.0)
+    setattr(new_event, "le", 999999.0)
+
+    new_detail = new_event.detail
+    setattr(new_detail.contact, "endpoint", "192.168.0.20:4242:tcp")
+    setattr(new_detail.contact, "callsign", "hopper")
+    # setattr(new_detail.group, "name", "value")
+    # setattr(new_detail.group, "role", "value")
+    # new_detail.status.battery = int(100)
+    # setattr(new_detail.track, "speed", float(40))
+    # setattr(new_detail.track, "course", float(360))
+
+    protover = TAKProtoVer.MESH
+    output = msg2proto(tak_message, protover)
+    return output
+
+    
+def format_time(time: str) -> int:
+    """Format timestamp as microseconds."""
+    s_time = datetime.strptime(time + "+0000", ISO_8601_UTC + "%z")
+    return int(s_time.timestamp() * 1000)
+
+def msg2proto(msg, protover: Optional[TAKProtoVer] = None) -> bytearray:
+    """Convert a TakMessage into a TAK Protocol Version 1 protobuf."""
+    protover = protover or TAKProtoVer.MESH
+
+    output_ba = bytearray()
+    header_ba = bytearray()
+    proto_ba = bytearray()
+
+    if protover == TAKProtoVer.MESH:
+        header_ba = DEFAULT_MESH_HEADER
+        proto_ba = bytearray(msg.SerializeToString())
+    elif protover == TAKProtoVer.STREAM:
+        header_ba = DEFAULT_PROTO_HEADER
+        output_io = BytesIO()
+        dpb.write(output_io, msg)
+        proto_ba = bytearray(output_io.getvalue())
+    else:
+        raise ValueError(f"Unsupported TAKProtoVer: {protover}")
+
+    output_ba = header_ba + proto_ba
+    return output_ba
+
+
+
+
+async def kismet2cotOLD(data):
     # print("data=", data)
     obj = json.loads(data)
     # print("obj=", obj)
