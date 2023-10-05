@@ -55,6 +55,7 @@ def squirt(data: bytearray, addr=MULTICAST_ADDR, port=MULTICAST_PORT, host=HOST)
     print("sending ", data, " to ", addr, ":", port)
     sock.sendto(data, (addr, port))
 
+# This main() is for testing purposes only
 if __name__ == "__main__":
     from cot import CoT
     from takproto.constants import TAKProtoVer
