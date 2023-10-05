@@ -97,7 +97,7 @@ class CoT:
         return getattr(self.new_event, "type")
     
     def setType(self, type):
-        setattr(self.new_event, "type", "a-u-G")
+        setattr(self.new_event, "type", type)
     
     def getUid(self):
         return getattr(self.new_event, "uid")
@@ -109,25 +109,35 @@ class CoT:
         return getattr(self.new_event, "how")
     
     def setHow(self, how):
-        setattr(self.new_event, "how", "m-g")
+        setattr(self.new_event, "how", how)
     
     def getTime(self):
         return getattr(self.new_event, "sendTime")
     
-    def setTime(self, time):
-        setattr(self.new_event, "sendTime", self.toMicroseconds(self.cot_time()))
+    def setTime(self, time=None):
+        if time == None:
+            time = self.cot_time()
+            
+        setattr(self.new_event, "sendTime", self.toMicroseconds(time))
     
     def getStart(self):
         return getattr(self.new_event, "startTime")
     
-    def setStart(self, start):
-        setattr(self.new_event, "startTime", self.toMicroseconds(self.cot_time()))
+    def setStart(self, start=None):
+        if start == None:
+            start = self.cot_time()
+            
+        setattr(self.new_event, "startTime", self.toMicroseconds(start))
     
     def getStale(self):
         return getattr(self.new_event, "staleTime")
-    
+
+    # Pass in stale time in seconds to offset current time.    
     def setStale(self, stale):
-        setattr(self.new_event, "staleTime", self.toMicroseconds(self.cot_time(3600)))
+        if stale == None:
+            stale = self.cot_time(stale)
+            
+        setattr(self.new_event, "staleTime", self.toMicroseconds(stale))
     
     def getLat(self):
         return getattr(self.new_event, "lat")
@@ -145,19 +155,19 @@ class CoT:
         return getattr(self.new_event, "hae")
 
     def setHae(self, hae):
-        setattr(self.new_event, "hae", 1.0)
+        setattr(self.new_event, "hae", hae)
     
     def getCe(self):
         return getattr(self.new_event, "ce")
     
     def setCe(self, ce):
-        setattr(self.new_event, "ce", 999999.0)
+        setattr(self.new_event, "ce", ce)
     
     def getLe(self):
         return getattr(self.new_event, "le")
     
     def setLe(self, le):
-        setattr(self.new_event, "le", 999999.0)
+        setattr(self.new_event, "le", le)
     
     def getDetail(self):
         return getattr(self.new_event, "detail")
@@ -169,19 +179,19 @@ class CoT:
         return getattr(self.new_event, "access")
     
     def setAccess(self, access):
-        setattr(self.new_event, "access", "m-g")
+        setattr(self.new_event, "access", access)
     
     def getOpex(self):
         return getattr(self.new_event, "opex")
     
     def setOpex(self, opex):
-        setattr(self.new_event, "opex", "m-g")
+        setattr(self.new_event, "opex", opex)
     
     def getQos(self):
         return getattr(self.new_event, "qos")
     
     def setQos(self, qos):
-        setattr(self.new_event, "qos", "m-g")
+        setattr(self.new_event, "qos", qos)
     
     def fromXML(self, xml: str):
         pb = xml2proto(xml)
