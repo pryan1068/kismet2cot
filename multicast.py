@@ -1,20 +1,18 @@
 import asyncio
 import socket
-# from cot import CoT
 
 MULTICAST_PORT = 6969
 MULTICAST_ADDR = "239.2.3.1"
 HOST = "0.0.0.0"
 
-class CoTMulticast:
+class Multicast:
     def __init__(self, queue):
-        self.queue = queue
+        self.cotqueue = queue
         self.loop = asyncio.get_event_loop()
         self.sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
         self.sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(MULTICAST_ADDR) + socket.inet_aton(HOST))
         self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.sock.bind((HOST, MULTICAST_PORT))
-
 
     def startListening(self, addr, port):
         print('listening(', addr, ", ", port, ")")
@@ -31,7 +29,7 @@ class CoTMulticast:
 
     def datagram_received(self, data, addr):
         print('datagram_received {!r} from {!r}'.format(data, addr))
-        self.queue.put_nowait(data)
+        self.cotqueue.put_nowait(data)
 
     def error_received(self, exc):
         print('error_received:', exc)
@@ -47,11 +45,36 @@ class CoTMulticast:
             # self.loop.close()
     
         print("multicast is done.")
-                
+
+
+def squirt(data: bytearray, addr=MULTICAST_ADDR, port=MULTICAST_PORT, host=HOST):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(addr) + socket.inet_aton(host))
+    sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+    sock.bind((host, port))
+    print("sending ", data, " to ", addr, ":", port)
+    sock.sendto(data, (addr, port))
+
 if __name__ == "__main__":
-    inputQueue = asyncio.Queue()
-    cotMulticast = CoTMulticast(inputQueue)
-    asyncio.run(cotMulticast.mainLoop())
+    from cot import CoT
+    from takproto.constants import TAKProtoVer
+
+    # Create a CoT message
+    cot = CoT(uid="Pete Mitchell", callsign="Maverick", type="a-f-G-E-W-R-R", lat=40.0, lon=-84.0)
+
+    # Open-Squirt-Close the cot message to the multicast address in Version 0 (XML)
+    squirt(cot.getPayload(TAKProtoVer.XML))
+
+    # Open-Squirt-Close the cot message to the multicast address in Version 1 (Protobuf Mesh)
+    squirt(cot.getPayload(TAKProtoVer.MESH))
+
+    # Open-Squirt-Close the cot message to the multicast address in Version 1 (Protobuf Stream)
+    squirt(cot.getPayload(TAKProtoVer.STREAM))
+
+    # Listen for multicast messages
+    # inputQueue = asyncio.Queue()
+    # cotMulticast = Multicast(inputQueue)
+    # asyncio.run(cotMulticast.mainLoop())
 
 
 
