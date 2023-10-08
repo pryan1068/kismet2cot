@@ -218,9 +218,9 @@ class CoT:
         output += "Type: " + self.getType() + ", "
         output += "UID: " + self.getUid() + ", "
         output += "How: " + self.getHow() + ", "
-        output += "Time: " + str(self.getTime()) + ", "
-        output += "Start: " + str(self.getStart()) + ", "
-        output += "Stale: " + str(self.getStale()) + ", "
+        output += "Time: " + str(self.fromMicroseconds(self.getTime())) + ", "
+        output += "Start: " + str(self.fromMicroseconds(self.getStart())) + ", "
+        output += "Stale: " + str(self.fromMicroseconds(self.getStale())) + ", "
         output += "Lat: " + str(self.getLat()) + ", "
         output += "Lon: " + str(self.getLon()) + ", "
         output += "HAE: " + str(self.getHae()) + ", "
@@ -251,9 +251,9 @@ class CoT:
         event.set("type", self.getType())
         event.set("uid", self.getUid())
         event.set("how", self.getHow())
-        event.set("time", str(self.getTime()))
-        event.set("start", str(self.getStart()))
-        event.set("stale", str(self.getStale()))
+        event.set("time", str(self.fromMicroseconds(self.getTime())))
+        event.set("start", str(self.fromMicroseconds(self.getStart())))
+        event.set("stale", str(self.fromMicroseconds(self.getStale())))
         event.set("access", str(self.getAccess()))
         event.set("opex", str(self.getOpex()))
         event.set("qos", str(self.getQos()))
@@ -308,8 +308,9 @@ class CoT:
 
     # Create timestamp from microseconds.
     def fromMicroseconds(self, millis: int):
-        dt = datetime.fromtimestamp(millis / 1000.0, tz=datetime.timezone.utc)
-        return dt
+        time = datetime.datetime.fromtimestamp(millis / 1000.0, tz=datetime.timezone.utc)
+        return time.strftime(CoT.ISO_8601_UTC)
+        return time
 
     # Return current time in CoT format.
     # Pass in stale time in seconds to offset current time.
