@@ -1,5 +1,6 @@
 import asyncio
 import socket
+import logging
 
 MULTICAST_PORT = 6969
 MULTICAST_ADDR = "239.2.3.1"
@@ -15,16 +16,16 @@ class Multicast:
         self.sock.bind((HOST, MULTICAST_PORT))
 
     def startListening(self, addr, port):
-        print('listening(', addr, ", ", port, ")")
+        logging.info("listening(%s, %s):", addr, port)
         self.listen = self.loop.create_datagram_endpoint(lambda: self, sock=self.sock)
         asyncio.ensure_future(self.listen)
 
     def send(self, data):
-        print('sending:', data)
+        logging.info("sending:%s", data)
         self.sock.sendto(data, (MULTICAST_ADDR, MULTICAST_PORT))
 
     def connection_made(self, transport):
-        print("Connection made")
+        logging.info("Connection made")
         self.transport = transport
 
     def datagram_received(self, data, addr):
@@ -32,10 +33,18 @@ class Multicast:
         self.cotqueue.put_nowait(data)
 
     def error_received(self, exc):
-        print('error_received:', exc)
+        logging.info("Error Received: %s", exc)
 
     def connection_lost(self, exc):
-        print("connection_lost")
+        logging.info("Connection Lost: %s", exc)
+
+    async def run(self):
+        while True:
+            # Get the cot data from the cotqueue
+            data = await self.config.cotqueue.get()
+
+            # Send it to the multicast address
+            await self.send(data)
 
     async def mainLoop(self):
         try:
@@ -51,6 +60,20 @@ def squirt(data: bytearray, addr=MULTICAST_ADDR, port=MULTICAST_PORT, host=HOST)
     sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
     sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, socket.inet_aton(addr) + socket.inet_aton(host))
     sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+    sock.bind((host, port))
+    print("sending ", data, " to ", addr, ":", port)
+    sock.sendto(data, (addr, port))
+
+import struct
+def squirt(data: bytearray, addr=MULTICAST_ADDR, port=MULTICAST_PORT, host=HOST):
+    sock = socket.socket(socket.AF_INET, socket.SOCK_DGRAM, socket.IPPROTO_UDP)
+
+    group = socket.inet_aton(addr)
+    mreq = struct.pack("4sL", group, socket.INADDR_ANY)
+    sock.setsockopt(socket.IPPROTO_IP, socket.IP_ADD_MEMBERSHIP, mreq)
+    # sock.setsockopt(sock.IPPROTO_IP, socket.IP_MULTICAST_TTL, struct.pack("b", 1))
+
     sock.bind((host, port))
     print("sending ", data, " to ", addr, ":", port)
     sock.sendto(data, (addr, port))
@@ -73,9 +96,8 @@ if __name__ == "__main__":
     squirt(cot.getPayload(TAKProtoVer.STREAM))
 
     # Listen for multicast messages
-    # inputQueue = asyncio.Queue()
-    # cotMulticast = Multicast(inputQueue)
-    # asyncio.run(cotMulticast.mainLoop())
+    cotMulticast = Multicast(asyncio.Queue())
+    asyncio.run(cotMulticast.mainLoop())
 
 
 
