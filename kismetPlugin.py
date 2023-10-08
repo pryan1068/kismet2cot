@@ -1,23 +1,13 @@
-import asyncio
-import pytak
 import time
+
+# pytak imports
+import pytak
 
 # kismet imports
 import websockets
 import json
 import requests
 from requests.auth import HTTPBasicAuth
-
-# TAK imports
-from takproto.constants import (
-    ISO_8601_UTC,
-    DEFAULT_MESH_HEADER,
-    DEFAULT_PROTO_HEADER,
-    TAKProtoVer,
-)
-from takproto.proto import TakMessage
-
-from multicast import Multicast
 from cot import CoT
 
 class KismetReceiver(pytak.QueueWorker):
@@ -26,7 +16,6 @@ class KismetReceiver(pytak.QueueWorker):
     basenameAlias="device.name"
     lastGeopointKey="kismet.device.base.location/kismet.common.location.last/kismet.common.location.geopoint"
     lastGeopointAlias="location.geopoint"
-    # Very strange: signal only works if I use an underbar vice a period on last node:
     rssiKey="kismet.device.base.signal/kismet.common.signal.last_signal"
     rssiAlias="signal.last.signal"
     altKey="kismet.common.location.alt"
@@ -50,7 +39,11 @@ class KismetReceiver(pytak.QueueWorker):
                 KISMET_USER = self.config["KISMET_USER"]
                 KISMET_PASSWORD = self.config["KISMET_PASSWORD"]
                 basic = HTTPBasicAuth(KISMET_USER, KISMET_PASSWORD)
-                url = 'http://localhost:2501/session/check_session'
+                # Where is kismet running at?
+                kismetHost = self.config["KISMET_HOST"]
+                kismetPort = self.config["KISMET_PORT"]
+                # url = 'http://localhost:2501/session/check_session'
+                url = "".join(['http://', kismetHost, ":", kismetPort, '/session/check_session'])
                 response = requests.get(url, auth=basic)
 
             except Exception as e:
@@ -88,11 +81,7 @@ class KismetReceiver(pytak.QueueWorker):
         }
 
         try:
-            # Temporary hack to get things working
-            # Replace with queue based message passing
-            mc = Multicast(asyncio.Queue())
-
-            # Now request the data from kismet
+            # Now request the detections from kismet
             async with websockets.connect(devicesRequest, extra_headers=myheaders) as websocket:
                 self._logger.debug("open=%s", websocket.open)
                 self._logger.debug("request_headers=%s", websocket.request_headers)
@@ -101,21 +90,20 @@ class KismetReceiver(pytak.QueueWorker):
                 # Send the filtered list of what we want to see
                 await websocket.send(json.dumps(req));
 
-                async for data in websocket:
-                    self._logger.debug("kismet=%s", data)
+                async for detection in websocket:
+                    # self._logger.debug("kismet=%s", detection)
 
                     # convert the kismet data into cot
                     cot = CoT()
-                    await self.kismet2cot(data, cot)
-                    self._logger.info("cot=%s", cot.toString())
+                    await self.kismet2cot(detection, cot)
 
-                    # protover = TAKProtoVer.MESH
-                    # pb = cot.toProtobuf(cot.tak_message, protover)
-                    pb = cot.getPayload()                    
-                    mc.send(pb)
-                    
-                    # Input the cot data onto the cotqueue
-                    await self.config.cotqueue.put(data)
+                    # Convert the cot data into xml so pytak can send it out
+                    xml = cot.toXML()
+                    # self._logger.debug("cot=%s", cot.toString())
+                    # self._logger.debug("xml=%s", xml)
+
+                    # Output the cot data into the tx_queue so the TXWorker can pick it up and send it out
+                    await self.put_queue(xml)
         except websockets.exceptions.InvalidStatusCode as code:
             print('code=', code.status_code)
             if code.status_code == 401:
@@ -161,6 +149,8 @@ class KismetReceiver(pytak.QueueWorker):
 
         return cot
 
+    # If the key is in the obj, return the value. Otherwise, return the default.
+    # Ensure the value returned is always a string.
     def get(self, key: str, obj: dict, default):
         # print('key=', key, ' default=', default, ' obj=', obj)
         if key in obj:
