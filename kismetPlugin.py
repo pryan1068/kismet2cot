@@ -42,92 +42,95 @@ class KismetReceiver(pytak.QueueWorker):
         # Future: Consider using aiohttp to speed up connecting to kismet if it does basic auth.
 
         # Authenticate with kismet
-        response = None
-        while response == None:
+        while True:
+            response = None
+            while response == None:
+                try:
+                    # Kismet user and password that you assigned the first time you ran it
+                    KISMET_USER = self.config["KISMET_USER"]
+                    KISMET_PASSWORD = self.config["KISMET_PASSWORD"]
+                    basic = HTTPBasicAuth(KISMET_USER, KISMET_PASSWORD)
+                    
+                    # Where is kismet running at?
+                    kismetHost = self.config["KISMET_HOST"]
+                    kismetPort = self.config["KISMET_PORT"]
+                    # url = 'http://localhost:2501/session/check_session'
+                    url = "".join(['http://', kismetHost, ":", kismetPort, '/session/check_session'])
+                    response = requests.get(url, auth=basic)
+
+                except Exception as e:
+                    self._logger.error(f"Connect failed to kismet {url}. IS IT RUNNING? Retrying...")
+                    time.sleep(3)
+
+            # Use the kismet cookie for subsequent requests
+            kismetCookie = self.get('KISMET', response.cookies, 'INVALID KEY')
+            self._logger.debug("KISMET=%s", kismetCookie)
+
+            myheaders = {
+                "Cookie":f"KISMET={kismetCookie}"
+            }
+
+            # NOTE: Below is a filtered list of what data kismet should send to you. 
+            # If we received every piece of data, it would overwhelm comms and we
+            # would end up dropping network packets. So only request what you need.
+            # See the kismet2cot() function below where this data is used.
+            devicesRequest = "ws://localhost:2501/devices/monitor.ws"
+
+            req = {
+                "monitor": "*",
+                "request": 1,
+                "rate": 1,
+                "fields": [ 
+                    [self.basenameKey, self.basenameAlias],
+                    [self.lastGeopointKey, self.lastGeopointAlias],
+                    [self.altKey, self.altAlias],
+                    [self.manufKey, self.manufAlias],
+                    [self.ssidKey, self.ssidAlias],
+                    [self.rssiKey, self.rssiAlias],
+                    [self.macAddrKey, self.macAddrAlias]
+                ]
+            }
+
             try:
-                # Kismet user and password that you assigned the first time you ran it
-                KISMET_USER = self.config["KISMET_USER"]
-                KISMET_PASSWORD = self.config["KISMET_PASSWORD"]
-                basic = HTTPBasicAuth(KISMET_USER, KISMET_PASSWORD)
-                
-                # Where is kismet running at?
-                kismetHost = self.config["KISMET_HOST"]
-                kismetPort = self.config["KISMET_PORT"]
-                # url = 'http://localhost:2501/session/check_session'
-                url = "".join(['http://', kismetHost, ":", kismetPort, '/session/check_session'])
-                response = requests.get(url, auth=basic)
+                # Now request the detections from kismet
+                async with websockets.connect(devicesRequest, extra_headers=myheaders) as websocket:
+                    self._logger.info("Connected to kismet.")
+                    self._logger.debug("open=%s", websocket.open)
+                    self._logger.debug("request_headers=%s", websocket.request_headers)
+                    self._logger.debug("response_headers=%s", websocket.response_headers)
 
+                    # Send the filtered list of what we want to see
+                    await websocket.send(json.dumps(req));
+
+                    async for detection in websocket:
+                        self._logger.debug("kismet=%s", detection)
+
+                        # convert the kismet data into cot
+                        cot = CoT()
+                        await self.kismet2cot(detection, cot)
+
+                        # Convert the cot data into xml so pytak can send it out
+                        xml = cot.toXML()
+                        # self._logger.debug("cot=%s", cot.toString())
+                        self._logger.debug("xml=%s", xml)
+
+                        if not xml:
+                            self._logger.error("xml is empty.")
+                            continue
+
+                        # Output the cot data into the tx_queue so the TXWorker can pick it up and send it out
+                        await self.put_queue(xml)
+            except websockets.exceptions.InvalidStatusCode as code:
+                self._logger.error('code={code.status_code}')
+                if code.status_code == 401:
+                    self._logger.fatal("======================================================================================")
+                    self._logger.fatal(f"Verify username({KISMET_USER}) and password({KISMET_PASSWORD}) are matching in kismet")
+                    self._logger.fatal("======================================================================================")
+                    exit(1)
             except Exception as e:
-                # print(e)
-                self._logger.error(f"Connect failed to {url}. Retrying in 3 seconds...")
+                print(e)
+                self._logger.error(f"Connect failed to {devicesRequest}. Retrying...")
                 time.sleep(3)
-
-        # Use the kismet cookie for subsequent requests
-        kismetCookie = self.get('KISMET', response.cookies, 'INVALID KEY')
-        self._logger.debug("KISMET=%s", kismetCookie)
-
-        myheaders = {
-            "Cookie":f"KISMET={kismetCookie}"
-        }
-
-        # NOTE: Below is a filtered list of what data kismet should send to you. 
-        # If we received every piece of data, it would overwhelm comms and we
-        # would end up dropping network packets. So only request what you need.
-        # See the kismet2cot() function below where this data is used.
-        devicesRequest = "ws://localhost:2501/devices/monitor.ws"
-
-        req = {
-            "monitor": "*",
-            "request": 1,
-            "rate": 1,
-            "fields": [ 
-                [self.basenameKey, self.basenameAlias],
-                [self.lastGeopointKey, self.lastGeopointAlias],
-                [self.altKey, self.altAlias],
-                [self.manufKey, self.manufAlias],
-                [self.ssidKey, self.ssidAlias],
-                [self.rssiKey, self.rssiAlias],
-                [self.macAddrKey, self.macAddrAlias]
-            ]
-        }
-
-        try:
-            # Now request the detections from kismet
-            async with websockets.connect(devicesRequest, extra_headers=myheaders) as websocket:
-                self._logger.debug("open=%s", websocket.open)
-                self._logger.debug("request_headers=%s", websocket.request_headers)
-                self._logger.debug("response_headers=%s", websocket.response_headers)
-
-                # Send the filtered list of what we want to see
-                await websocket.send(json.dumps(req));
-
-                async for detection in websocket:
-                    self._logger.debug("kismet=%s", detection)
-
-                    # convert the kismet data into cot
-                    cot = CoT()
-                    await self.kismet2cot(detection, cot)
-
-                    # Convert the cot data into xml so pytak can send it out
-                    xml = cot.toXML()
-                    # self._logger.debug("cot=%s", cot.toString())
-                    self._logger.debug("xml=%s", xml)
-
-                    if not xml:
-                        self._logger.error("xml is empty.")
-                        continue
-
-                    # Output the cot data into the tx_queue so the TXWorker can pick it up and send it out
-                    await self.put_queue(xml)
-        except websockets.exceptions.InvalidStatusCode as code:
-            print('code=', code.status_code)
-            if code.status_code == 401:
-                print("======================================================================================")
-                print(f"Verify username({KISMET_USER}) and password({KISMET_PASSWORD}) are matching in kismet")
-                print("======================================================================================")
-        except Exception as e:
-            print(e)
-            self._logger.fatal(f"Connect failed to {devicesRequest}.")
 
     async def kismet2cot(self, data: str, cot: CoT=CoT()):
         # Deserialize str instance containing a JSON document to a Python object.
