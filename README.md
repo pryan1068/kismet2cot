@@ -14,7 +14,7 @@ Install the debian 64-bit version (https://www.kismetwireless.net/packages/#debi
 
 Don't forget to run the usermod command to add your username to the kismet group. Follow this instruction: https://www.kismetwireless.net/docs/readme/installing/linux/#setting-up-the-group
 
-Configure kismet to automatically begin capturing at startup by modifying the source= value in /etc/kismet_site.conf to point to your wi-fi radio (See https://www.kismetwireless.net/docs/readme/configuring/configfiles/#customizing-configs-with-kismet_siteconf).
+Configure kismet to automatically begin capturing from the wifi device at startup. You can discover the device name by running kismet and pointing your browser at http://localhost:2501/. Select Data Sources from the 3 line menu icon (upper left). There will likely be 3 "Available Interfaces"; 1 bluetooth and 2 wifi. 1 wifi is the builtin RPi wifi. The other one is what you want to use. Configure kismet by modifying the source= value in /etc/kismet_site.conf to point to your wi-fi radio (See https://www.kismetwireless.net/docs/readme/configuring/configfiles/#customizing-configs-with-kismet_siteconf).
 
 ## kismet2cot
 
@@ -40,7 +40,7 @@ Simply run the main script:
 
 >python k2c.py
 
-You can run kismet first or k2c.py first.
+You can run kismet first or k2c.py first. Doesn't matter.
 
 You can see what's going on under the hood by changing the logging level to INFO or DEBUG:
 
@@ -53,13 +53,9 @@ A Python script was determined to be the best solution since it is portable, sim
 
 The PyTAK library (See https://github.com/snstac/pytak) has the CoT side solved, so it was used for sending out CoT. PyTAK also leverages Python's ayncio feature to ensure network data inputs don't get dropped. kismet2cot followed their same architecture to keep things simple and consistent.
 
-kismet has a python-kismet-rest library (See https://github.com/kismetwireless/python-kismet-rest) which handles all the REST API communication, however it does not appear to handle realtime updates.
+kismet has a python-kismet-rest library (See https://github.com/kismetwireless/python-kismet-rest) which handles all the REST API communication, however it does not appear to handle realtime updates, so it was built from scratch.
 
-Additional Receiver and Sender plugins were provided for stdio to allow piping inputs and outputs if so desired. Out of the box kismet2cot will subscribe to kismet (WiFi and Bluetooth) devices, and output them to multicast CoT.
-
-k2c.py defines which Receiver (kismet, pytak or stdin) and which Sender (PyTAK or stdout) to use.
-
-config.ini is a PyTAK config file that defines where CoT goes (unicast to TAKServer or multicast to all local End User Devices).
+config.ini also defines where CoT goes (unicast to TAKServer or multicast to all local End User Devices). Modify accordingly.
 
 
 
