@@ -2,11 +2,14 @@
 
 import asyncio
 import pytak
-from configparser import ConfigParser
-
-from stdioPlugin import StdioSender
-from kismetPlugin import KismetReceiver
+import os.path
+import logging.config
+import argparse
 import logging
+from configparser import ConfigParser
+from kismetPlugin import KismetReceiver
+
+LOGGING_CONFIG="logging.ini"
 
 # ======================================================================================
 # Kismet to CoT
@@ -17,18 +20,26 @@ import logging
 #
 # ======================================================================================
 async def main():
-    # Enable this to see websockets debug output
-    logger = logging.getLogger('pytak.classes')
-    logger.setLevel(logging.DEBUG)
-    logger.addHandler(logging.StreamHandler())
+    _logger = logging.getLogger(__name__)
 
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument( '-log',
+                     '--loglevel',
+                     default='warning',
+                     help='Provide logging level. Example --loglevel debug, default=warning' )
+
+    args = argparser.parse_args()
+    logging.getLogger("kismetPlugin").setLevel(args.loglevel.upper())
+    logging.getLogger("pytak.classes").setLevel(args.loglevel.upper())
+
+    # If there's a logging.ini file, use it to configure logging.
+    if os.path.isfile(LOGGING_CONFIG):
+        logging.config.fileConfig(LOGGING_CONFIG, disable_existing_loggers=False)
+    
     # config.ini contains configuration settings
     parser = ConfigParser()
     parser.read("config.ini")
     config = parser["kismet"]
-
-    # create a cotqueue in config for all the plugins to use
-    config.cotqueue = asyncio.Queue()
 
     # Initializes worker queues and tasks.
     clitool = pytak.CLITool(config)
@@ -37,6 +48,7 @@ async def main():
     # Capture Kismet data and send it out as CoT
     clitool.add_task(KismetReceiver(clitool.tx_queue, config))
     
+    # Start processing data from kismet to CoT
     await clitool.run()
 
 if __name__ == "__main__":

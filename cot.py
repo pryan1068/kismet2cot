@@ -1,4 +1,5 @@
 import datetime
+import logging
 from typing import Union, Optional
 from io import BytesIO
 import xml.etree.ElementTree as ET
@@ -32,6 +33,15 @@ from takproto.constants import (
 #===============================================================================
 
 class CoT:
+    # _logger = logging.getLogger(__name__)
+    # if not _logger.handlers:
+    #     _logger.setLevel(pytak.LOG_LEVEL)
+    #     _console_handler = logging.StreamHandler()
+    #     _console_handler.setLevel(pytak.LOG_LEVEL)
+    #     _console_handler.setFormatter(pytak.LOG_FORMAT)
+    #     _logger.addHandler(_console_handler)
+    #     _logger.propagate = False
+
     ISO_8601_UTC = "%Y-%m-%dT%H:%M:%S.%fZ"
     
     # Constructor. Pass in a bytearray to parse, or pass in the desired values.
@@ -246,35 +256,41 @@ class CoT:
         # which fields are required?
         # what are good defaults for them?
         # Need to do this for all the toXXX() methods
-        event = ET.Element("event")
-        event.set("version", "2.0")
-        event.set("type", self.getType())
-        event.set("uid", self.getUid())
-        event.set("how", self.getHow())
-        event.set("time", str(self.fromMicroseconds(self.getTime())))
-        event.set("start", str(self.fromMicroseconds(self.getStart())))
-        event.set("stale", str(self.fromMicroseconds(self.getStale())))
-        event.set("access", str(self.getAccess()))
-        event.set("opex", str(self.getOpex()))
-        event.set("qos", str(self.getQos()))
-        
-        pt_attr = {
-            "lat": str(self.getLat()),
-            "lon": str(self.getLon()),
-            "hae": str(self.getHae()),
-            "ce": str(self.getCe()),
-            "le": str(self.getLe()),
-        }
+        xml = None
 
-        ET.SubElement(event, "point", attrib=pt_attr)
+        try:
+            event = ET.Element("event")
+            event.set("version", "2.0")
+            event.set("type", self.getType())
+            event.set("uid", self.getUid())
+            event.set("how", self.getHow())
+            event.set("time", str(self.fromMicroseconds(self.getTime())))
+            event.set("start", str(self.fromMicroseconds(self.getStart())))
+            event.set("stale", str(self.fromMicroseconds(self.getStale())))
+            event.set("access", str(self.getAccess()))
+            event.set("opex", str(self.getOpex()))
+            event.set("qos", str(self.getQos()))
+            
+            pt_attr = {
+                "lat": str(self.getLat()),
+                "lon": str(self.getLon()),
+                "hae": str(self.getHae()),
+                "ce": str(self.getCe()),
+                "le": str(self.getLe()),
+            }
 
-        # todo - add detail
-        # detail = ET.SubElement(event, self.getDetail())
-        # contact = ET.SubElement(detail, self.getContact())
+            ET.SubElement(event, "point", attrib=pt_attr)
 
-        s = ET.tostring(event)
+            # todo detail
+            # detail = ET.SubElement(event, "detail")
+            # kismet = ET.SubElement(detail, ET.fromstring("Hello World!"))
+            # detail.set("unknown", self.getDetail())
 
-        return ET.tostring(event)
+            xml = ET.tostring(event)
+        except Exception as e:
+            logging.error(f"{e}")
+
+        return xml
 
     # Convert a TAKProto TakMessage into a TAK Protocol Version 1 protobuf.
     def toProtobuf(self, msg: TakMessage=None, protover: Optional[TAKProtoVer] = None) -> bytearray:

@@ -1,4 +1,5 @@
 import time
+import logging
 
 # pytak imports
 import pytak
@@ -11,6 +12,15 @@ from requests.auth import HTTPBasicAuth
 from cot import CoT
 
 class KismetReceiver(pytak.QueueWorker):
+    _logger = logging.getLogger(__name__)
+    if not _logger.handlers:
+        _logger.setLevel(pytak.LOG_LEVEL)
+        _console_handler = logging.StreamHandler()
+        _console_handler.setLevel(pytak.LOG_LEVEL)
+        _console_handler.setFormatter(pytak.LOG_FORMAT)
+        _logger.addHandler(_console_handler)
+        _logger.propagate = False
+
     # Keys and Aliases for the data we want to receive from kismet
     basenameKey="kismet.device.base.name"
     basenameAlias="device.name"
@@ -39,6 +49,7 @@ class KismetReceiver(pytak.QueueWorker):
                 KISMET_USER = self.config["KISMET_USER"]
                 KISMET_PASSWORD = self.config["KISMET_PASSWORD"]
                 basic = HTTPBasicAuth(KISMET_USER, KISMET_PASSWORD)
+                
                 # Where is kismet running at?
                 kismetHost = self.config["KISMET_HOST"]
                 kismetPort = self.config["KISMET_PORT"]
@@ -91,7 +102,7 @@ class KismetReceiver(pytak.QueueWorker):
                 await websocket.send(json.dumps(req));
 
                 async for detection in websocket:
-                    # self._logger.debug("kismet=%s", detection)
+                    self._logger.debug("kismet=%s", detection)
 
                     # convert the kismet data into cot
                     cot = CoT()
@@ -100,16 +111,20 @@ class KismetReceiver(pytak.QueueWorker):
                     # Convert the cot data into xml so pytak can send it out
                     xml = cot.toXML()
                     # self._logger.debug("cot=%s", cot.toString())
-                    # self._logger.debug("xml=%s", xml)
+                    self._logger.debug("xml=%s", xml)
+
+                    if not xml:
+                        self._logger.error("xml is empty.")
+                        continue
 
                     # Output the cot data into the tx_queue so the TXWorker can pick it up and send it out
                     await self.put_queue(xml)
         except websockets.exceptions.InvalidStatusCode as code:
             print('code=', code.status_code)
             if code.status_code == 401:
-                print("======================================================================")
+                print("======================================================================================")
                 print(f"Verify username({KISMET_USER}) and password({KISMET_PASSWORD}) are matching in kismet")
-                print("======================================================================")
+                print("======================================================================================")
         except Exception as e:
             print(e)
             self._logger.fatal(f"Connect failed to {devicesRequest}.")
@@ -146,6 +161,8 @@ class KismetReceiver(pytak.QueueWorker):
         cot.setStale(cot.cot_time(3600))
         cot.setLat(lat)
         cot.setLon(lon)
+        # detail = "Manf=" + manf + " SSID=" + ssid + " RSSI=" + rssi + " MAC=" + macAddr
+        # cot.setDetail(detail)
 
         return cot
 
