@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timezone, timedelta
 import logging
 from typing import Union, Optional
 from io import BytesIO
@@ -319,22 +319,22 @@ class CoT:
 
     # Convert timestamp to microseconds.
     def toMicroseconds(self, time: str) -> int:
-        s_time = datetime.datetime.strptime(time + "+0000", ISO_8601_UTC + "%z")
+        s_time = datetime.strptime(time + "+0000", ISO_8601_UTC + "%z")
         return int(s_time.timestamp() * 1000)
 
     # Create timestamp from microseconds.
     def fromMicroseconds(self, millis: int):
-        time = datetime.datetime.fromtimestamp(millis / 1000.0, tz=datetime.timezone.utc)
+        time = datetime.fromtimestamp(millis / 1000.0, tz=timezone.utc)
         return time.strftime(CoT.ISO_8601_UTC)
         return time
 
     # Return current time in CoT format.
     # Pass in stale time in seconds to offset current time.
     def cot_time(self, cot_stale: Union[int, None] = None) -> str:
-        time = datetime.datetime.now(datetime.UTC)
+        time = datetime.utcnow()
         
         if cot_stale:
-            time = time + datetime.timedelta(seconds=int(cot_stale))
+            time = time + timedelta(seconds=int(cot_stale))
         
         return time.strftime(CoT.ISO_8601_UTC)
 
