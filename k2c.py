@@ -22,6 +22,10 @@ LOGGING_CONFIG="logging.ini"
 async def main():
     _logger = logging.getLogger(__name__)
 
+    # If there's a logging.ini file, use it to configure logging.
+    if os.path.isfile(LOGGING_CONFIG):
+        logging.config.fileConfig(LOGGING_CONFIG, disable_existing_loggers=False)
+    
     argparser = argparse.ArgumentParser()
     argparser.add_argument( '-log',
                      '--loglevel',
@@ -29,13 +33,14 @@ async def main():
                      help='Provide logging level. Example --loglevel debug, default=warning' )
 
     args = argparser.parse_args()
-    logging.getLogger("kismetPlugin").setLevel(args.loglevel.upper())
-    logging.getLogger("pytak.classes").setLevel(args.loglevel.upper())
+    if args.loglevel:
+        logging.getLogger().setLevel(args.loglevel.upper())
 
-    # If there's a logging.ini file, use it to configure logging.
-    if os.path.isfile(LOGGING_CONFIG):
-        logging.config.fileConfig(LOGGING_CONFIG, disable_existing_loggers=False)
-    
+    # logging.getLogger("CoT").setLevel(args.loglevel.upper())
+    # logging.getLogger("kismetPlugin").setLevel(args.loglevel.upper())
+    # logging.getLogger("pytak.classes").setLevel(args.loglevel.upper())
+    # logging.getLogger("pytak.functions").setLevel(args.loglevel.upper())
+
     # config.ini contains configuration settings
     parser = ConfigParser()
     parser.read("config.ini")
