@@ -13,13 +13,6 @@ from cot import CoT
 
 class KismetReceiver(pytak.QueueWorker):
     _logger = logging.getLogger(__name__)
-    if not _logger.handlers:
-        _logger.setLevel(pytak.LOG_LEVEL)
-        _console_handler = logging.StreamHandler()
-        _console_handler.setLevel(pytak.LOG_LEVEL)
-        _console_handler.setFormatter(pytak.LOG_FORMAT)
-        _logger.addHandler(_console_handler)
-        _logger.propagate = False
 
     # Keys and Aliases for the data we want to receive from kismet
     basenameKey="kismet.device.base.name"
@@ -102,20 +95,28 @@ class KismetReceiver(pytak.QueueWorker):
                     # Send the filtered list of what we want to see
                     await websocket.send(json.dumps(req));
 
+                    inputRecords = 0
+                    outputRecords = 0
                     async for detection in websocket:
-                        self._logger.debug("kismet=%s", detection)
+                        inputRecords += 1
+                        self._logger.debug(f"kismet #{inputRecords}={detection}")
 
                         # convert the kismet data into cot
                         cot = CoT()
                         await self.kismet2cot(detection, cot)
 
+                        self._logger.debug("cot=%s", cot.toString())
+                        if cot.isValid() == False:
+                            self._logger.debug("Invalid cot generated from kismet - skipping")
+                            continue
+
                         # Convert the cot data into xml so pytak can send it out
                         xml = cot.toXML()
-                        # self._logger.debug("cot=%s", cot.toString())
-                        self._logger.debug("xml=%s", xml)
+                        outputRecords += 1
+                        self._logger.debug(f"xml #{outputRecords}={xml}")
 
                         if not xml:
-                            self._logger.error("xml is empty.")
+                            self._logger.debug("xml is empty.")
                             continue
 
                         # Output the cot data into the tx_queue so the TXWorker can pick it up and send it out
