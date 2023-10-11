@@ -33,15 +33,7 @@ from takproto.constants import (
 #===============================================================================
 
 class CoT:
-    # _logger = logging.getLogger(__name__)
-    # if not _logger.handlers:
-    #     _logger.setLevel(pytak.LOG_LEVEL)
-    #     _console_handler = logging.StreamHandler()
-    #     _console_handler.setLevel(pytak.LOG_LEVEL)
-    #     _console_handler.setFormatter(pytak.LOG_FORMAT)
-    #     _logger.addHandler(_console_handler)
-    #     _logger.propagate = False
-
+    _logger = logging.getLogger(__name__)
     ISO_8601_UTC = "%Y-%m-%dT%H:%M:%S.%fZ"
     
     # Constructor. Pass in a bytearray to parse, or pass in the desired values.
@@ -103,6 +95,36 @@ class CoT:
         #     self.setCallsign(callsign)
         
     
+    def isValid(self):
+        rc = True
+
+        # Required fields:
+        if self.getType() == None:
+            self._logger.debug(f"Type: {self.getType()} is invalid.")
+            rc = False
+        
+        if self.getLat() == None or self.getLat() == 0:
+            self._logger.debug(f"Lat: {self.getLat()} is invalid.")
+            rc = False
+        
+        if self.getLon() == None or self.getLon() == 0:
+            self._logger.debug(f"Lon: {self.getLon()} is invalid.")
+            rc = False
+        
+        if self.getHae() == None:
+            self._logger.debug(f"HAE: {self.getHae()} is invalid.")
+            rc = False
+        
+        if self.getCe() == None:
+            self._logger.debug(f"CE: {self.getCe()} is invalid.")
+            rc = False
+        
+        if self.getLe() == None:
+            self._logger.debug(f"LE: {self.getLe()} is invalid.")
+            rc = False
+        
+        return rc
+
     def getType(self):
         return getattr(self.new_event, "type")
     
@@ -288,7 +310,7 @@ class CoT:
 
             xml = ET.tostring(event)
         except Exception as e:
-            logging.error(f"{e}")
+            self._logger.debug(f"{e}")
 
         return xml
 
