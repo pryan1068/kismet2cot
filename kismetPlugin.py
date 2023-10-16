@@ -12,23 +12,42 @@ from requests.auth import HTTPBasicAuth
 from cot import CoT
 
 class KismetReceiver(pytak.QueueWorker):
-    _logger = logging.getLogger(__name__)
-
     # Keys and Aliases for the data we want to receive from kismet
     basenameKey="kismet.device.base.name"
     basenameAlias="device.name"
+
+    # This might work when on the move
+    # lastGeopointKey="kismet.device.base.location/kismet.common.location.avg.loc/kismet.common.location.geopoint"
+    # lastGeopointAlias="location.geopoint"
+
+    # this often gives 0,0
     lastGeopointKey="kismet.device.base.location/kismet.common.location.last/kismet.common.location.geopoint"
     lastGeopointAlias="location.geopoint"
+
+    # works
     rssiKey="kismet.device.base.signal/kismet.common.signal.last_signal"
-    rssiAlias="signal.last.signal"
-    altKey="kismet.common.location.alt"
+    rssiAlias="rssi"
+
+    # works
+    altKey="kismet.device.base.location/kismet.common.location.last/kismet.common.location.alt"
     altAlias="alt"
+
+    # works
     manufKey="kismet.device.base.manuf"
     manufAlias="manuf"
-    ssidKey="dot11.device/dot11.device.advertised.ssid.map/dot11.advertisedssid.ssid"
-    ssidAlias="dot11.advertisedssid.ssid"
-    macAddrKey="kismet_device_base_macaddr"
+
+    # works
+    ssidKey="dot11.device/dot11.device.last_beaconed_ssid_record/dot11.advertisedssid.ssid"
+    ssidAlias="ssid"
+
+    # works
+    macAddrKey="kismet.device.base.macaddr"
     macAddrAlias="macAddr"
+
+    # constructor
+    def __init__(self, tx_queue, config):
+        super().__init__(tx_queue, config)
+        self._logger = logging.getLogger(__name__)
 
     async def run(self):
         self._logger.debug("Kismet: logging in...")
@@ -69,6 +88,7 @@ class KismetReceiver(pytak.QueueWorker):
             # See the kismet2cot() function below where this data is used.
             devicesRequest = "ws://localhost:2501/devices/monitor.ws"
 
+            # See https://www.kismetwireless.net/docs/api/devices/#subscription-api for req details
             req = {
                 "monitor": "*",
                 "request": 1,
@@ -165,8 +185,8 @@ class KismetReceiver(pytak.QueueWorker):
         cot.setStale(cot.cot_time(3600))
         cot.setLat(lat)
         cot.setLon(lon)
-        # detail = "Manf=" + manf + " SSID=" + ssid + " RSSI=" + rssi + " MAC=" + macAddr
-        # cot.setDetail(detail)
+        detail = "Manf=" + manf + " SSID=" + ssid + " RSSI=" + rssi + " MAC=" + macAddr + " Alt=" + alt
+        cot.setDetail(detail)
 
         return cot
 
