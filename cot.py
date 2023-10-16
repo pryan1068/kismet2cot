@@ -1,5 +1,6 @@
 from datetime import datetime, timezone, timedelta
 import logging
+
 from typing import Union, Optional
 from io import BytesIO
 import xml.etree.ElementTree as ET
@@ -33,15 +34,13 @@ from takproto.constants import (
 #===============================================================================
 
 class CoT:
-    _logger = logging.getLogger(__name__)
     ISO_8601_UTC = "%Y-%m-%dT%H:%M:%S.%fZ"
     
     # Constructor. Pass in a bytearray to parse, or pass in the desired values.
     def __init__(self, pb: bytearray=None, type=None, uid=None, how=None, time=None, start=None, stale=None, lat=None, lon=None, hae=None, ce=None, le=None, detail=None, access=None, opex=None, qos=None, callsign=None):
+        self._logger = logging.getLogger(__name__)
+
         self.tak_message = TakMessage()
-        self.new_event = self.tak_message.cotEvent
-        self.new_detail = self.new_event.detail
-        self.tak_control = self.tak_message.takControl
 
         if pb:
             self.fromProtobuf(pb)
@@ -126,104 +125,114 @@ class CoT:
         return rc
 
     def getType(self):
-        return getattr(self.new_event, "type")
+        return getattr(self.tak_message.cotEvent, "type")
     
     def setType(self, type):
-        setattr(self.new_event, "type", type)
+        setattr(self.tak_message.cotEvent, "type", type)
     
     def getUid(self):
-        return getattr(self.new_event, "uid")
+        return getattr(self.tak_message.cotEvent, "uid")
     
     def setUid(self, uid):
-        setattr(self.new_event, "uid", uid)
+        setattr(self.tak_message.cotEvent, "uid", uid)
     
     def getHow(self):
-        return getattr(self.new_event, "how")
+        return getattr(self.tak_message.cotEvent, "how")
     
     def setHow(self, how):
-        setattr(self.new_event, "how", how)
+        setattr(self.tak_message.cotEvent, "how", how)
     
     def getTime(self):
-        return getattr(self.new_event, "sendTime")
+        return getattr(self.tak_message.cotEvent, "sendTime")
     
     def setTime(self, time=None):
         if time == None:
             time = self.cot_time()
             
-        setattr(self.new_event, "sendTime", self.toMicroseconds(time))
+        setattr(self.tak_message.cotEvent, "sendTime", self.toMicroseconds(time))
     
     def getStart(self):
-        return getattr(self.new_event, "startTime")
+        return getattr(self.tak_message.cotEvent, "startTime")
     
     def setStart(self, start=None):
         if start == None:
             start = self.cot_time()
             
-        setattr(self.new_event, "startTime", self.toMicroseconds(start))
+        setattr(self.tak_message.cotEvent, "startTime", self.toMicroseconds(start))
     
     def getStale(self):
-        return getattr(self.new_event, "staleTime")
+        return getattr(self.tak_message.cotEvent, "staleTime")
 
     # Pass in stale time in seconds to offset current time.    
     def setStale(self, stale):
         if stale == None:
             stale = self.cot_time(stale)
             
-        setattr(self.new_event, "staleTime", self.toMicroseconds(stale))
+        setattr(self.tak_message.cotEvent, "staleTime", self.toMicroseconds(stale))
     
     def getLat(self):
-        return getattr(self.new_event, "lat")
+        return getattr(self.tak_message.cotEvent, "lat")
     
     def setLat(self, lat):
-        setattr(self.new_event, "lat", lat)
+        setattr(self.tak_message.cotEvent, "lat", lat)
     
     def getLon(self):
-        return getattr(self.new_event, "lon")
+        return getattr(self.tak_message.cotEvent, "lon")
     
     def setLon(self, lon):
-        setattr(self.new_event, "lon", lon)
+        setattr(self.tak_message.cotEvent, "lon", lon)
     
     def getHae(self):
-        return getattr(self.new_event, "hae")
+        return getattr(self.tak_message.cotEvent, "hae")
 
     def setHae(self, hae):
-        setattr(self.new_event, "hae", hae)
+        setattr(self.tak_message.cotEvent, "hae", hae)
     
     def getCe(self):
-        return getattr(self.new_event, "ce")
+        return getattr(self.tak_message.cotEvent, "ce")
     
     def setCe(self, ce):
-        setattr(self.new_event, "ce", ce)
+        setattr(self.tak_message.cotEvent, "ce", ce)
     
     def getLe(self):
-        return getattr(self.new_event, "le")
+        return getattr(self.tak_message.cotEvent, "le")
     
     def setLe(self, le):
-        setattr(self.new_event, "le", le)
+        setattr(self.tak_message.cotEvent, "le", le)
     
     def getDetail(self):
-        return getattr(self.new_event, "detail")
+        return getattr(self.tak_message.cotEvent, "detail").xmlDetail
     
     def setDetail(self, detail):
-        self.detail = detail
+        # TODO: Need to figure out how to handle this better.
+        # detail might have Contact and others that TAKMessage has code for, so xmlDetail is wrong for them.
+        # See functions.py in PyTAK for more info.
+        pass
+        self.tak_message.cotEvent.detail.xmlDetail = detail
     
     def getAccess(self):
-        return getattr(self.new_event, "access")
+        return getattr(self.tak_message.cotEvent, "access")
     
     def setAccess(self, access):
-        setattr(self.new_event, "access", access)
+        setattr(self.tak_message.cotEvent, "access", access)
     
     def getOpex(self):
-        return getattr(self.new_event, "opex")
+        return getattr(self.tak_message.cotEvent, "opex")
     
     def setOpex(self, opex):
-        setattr(self.new_event, "opex", opex)
+        setattr(self.tak_message.cotEvent, "opex", opex)
     
     def getQos(self):
-        return getattr(self.new_event, "qos")
+        return getattr(self.tak_message.cotEvent, "qos")
     
     def setQos(self, qos):
-        setattr(self.new_event, "qos", qos)
+        setattr(self.tak_message.cotEvent, "qos", qos)
+    
+    def getRemarks(self):
+        return self.getRemarks()
+
+    def setRemarks(self, remarks):
+        self.remarks = remarks
     
     def fromXML(self, xml: str):
         pb = xml2proto(xml)
@@ -231,15 +240,9 @@ class CoT:
 
     def fromTakMessage(self, takMessage: TakMessage):
         self.tak_message = takMessage
-        self.new_event = self.tak_message.cotEvent
-        self.new_detail = self.new_event.detail
-        self.tak_control = self.tak_message.takControl
 
     def fromProtobuf(self, pb: bytearray):
         self.tak_message = parse_proto(pb)
-        self.new_event = self.tak_message.cotEvent
-        self.new_detail = self.new_event.detail
-        self.tak_control = self.tak_message.takControl
 
     # Default toString() method
     def __str__(self):
@@ -258,7 +261,7 @@ class CoT:
         output += "HAE: " + str(self.getHae()) + ", "
         output += "CE: " + str(self.getCe()) + ", "
         output += "LE: " + str(self.getLe()) + ", "
-        # output += "Detail: " + self.getDetail() + ", "
+        output += "Detail: " + self.getDetail() + ", "
         output += "Access: " + self.getAccess() + ", "
         output += "Opex: " + self.getOpex() + ", "
         output += "Qos: " + self.getQos()
@@ -303,10 +306,8 @@ class CoT:
 
             ET.SubElement(event, "point", attrib=pt_attr)
 
-            # todo detail
-            # detail = ET.SubElement(event, "detail")
-            # kismet = ET.SubElement(detail, ET.fromstring("Hello World!"))
-            # detail.set("unknown", self.getDetail())
+            detail = ET.SubElement(event, "detail")
+            detail.text = self.getDetail()
 
             xml = ET.tostring(event)
         except Exception as e:
@@ -360,6 +361,75 @@ class CoT:
         
         return time.strftime(CoT.ISO_8601_UTC)
 
+class Remarks:
+    _logger = logging.getLogger(__name__)
+
+    def __init__(self, remarks: str=None):
+        self.remarks = remarks
+    
+    def __str__(self):
+        return self.toString()
+    
+    def toString(self):
+        output = str()
+        output += "Source: " + self.getSource() + ", "
+        output += "SourceID: " + self.getSourceID() + ", "
+        output += "Time: " + str(self.fromMicroseconds(self.getTime())) + ", "
+        output += "Time: " + str(self.getTime()) + ", "
+        output += "To: " + self.getTo() + ", "
+        output += "Remarks: " + self.getRemarks()
+
+        return output
+    
+    # Generate an ElementTree ELement from the Remarks object.
+    def toElement(self):
+        remarks = None
+
+        try:
+            remarks = ET.Element("remarks")
+            remarks.set("source", self.getType())
+            remarks.set("sourceID", self.getUid())
+            remarks.set("time", self.getHow())
+            remarks.set("to", str(self.fromMicroseconds(self.getTime())))
+
+            remarks.text = self.getRemarks()
+            
+        except Exception as e:
+            self._logger.debug(f"{e}")
+
+        return remarks
+
+    def getSource(self):
+        return self.source
+
+    def setSource(self, source: str):
+        self.source = source
+    
+    def getSourceID(self):
+        return self.sourceID
+    
+    def setSourceID(self, sourceID: str):
+        self.sourceID = sourceID
+    
+    def getTime(self):
+        return self.time
+
+    def setTime(self, time: str):
+        self.time = time
+    
+    def getTo(self):
+        return self.to
+    
+    def setTo(self, to: str):
+        self.to = to
+    
+    def getRemarks(self):
+        return self.remarks
+    
+    def setRemarks(self, remarks: str):
+        self.to = remarks
+    
+    
 # This main() is for testing purposes only.
 if __name__ == "__main__":
     xml = """<?xml version='1.0' encoding='UTF-8' standalone='yes'?>
