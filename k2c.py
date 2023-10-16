@@ -9,7 +9,9 @@ import logging
 from configparser import ConfigParser
 from kismetPlugin import KismetReceiver
 
-LOGGING_CONFIG="logging.ini"
+import os
+
+LOGGING_CONFIG="./logging.ini"
 
 # ======================================================================================
 # Kismet to CoT
@@ -20,26 +22,24 @@ LOGGING_CONFIG="logging.ini"
 #
 # ======================================================================================
 async def main():
-    _logger = logging.getLogger(__name__)
-
     # If there's a logging.ini file, use it to configure logging.
     if os.path.isfile(LOGGING_CONFIG):
         logging.config.fileConfig(LOGGING_CONFIG, disable_existing_loggers=False)
-    
-    argparser = argparse.ArgumentParser()
-    argparser.add_argument( '-log',
-                     '--loglevel',
-                     default='warning',
-                     help='Provide logging level. Example --loglevel debug, default=warning' )
 
-    args = argparser.parse_args()
-    if args.loglevel:
-        logging.getLogger().setLevel(args.loglevel.upper())
+    _logger = logging.getLogger(__name__)
 
-    # logging.getLogger("CoT").setLevel(args.loglevel.upper())
-    # logging.getLogger("kismetPlugin").setLevel(args.loglevel.upper())
-    # logging.getLogger("pytak.classes").setLevel(args.loglevel.upper())
-    # logging.getLogger("pytak.functions").setLevel(args.loglevel.upper())
+    # TODO: --log arg not working yet
+    # Look for a --log argument and set the logging level.
+    # argparser = argparse.ArgumentParser()
+    # argparser.add_argument( '-log',
+    #                  '--loglevel',
+    #                  default='warning',
+    #                  help='Provide logging level. Example --loglevel debug, default=warning' )
+    # args = argparser.parse_args()
+    # numeric_level = getattr(logging, args.loglevel.upper(), None)
+    # if not isinstance(numeric_level, int):
+    #     raise ValueError('Invalid log level: %s' % args.loglevel)
+    # _logger.setLevel(numeric_level)
 
     # config.ini contains configuration settings
     parser = ConfigParser()
