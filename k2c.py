@@ -24,7 +24,7 @@ LOGGING_CONFIG="./logging.ini"
 async def main():
     # If there's a logging.ini file, use it to configure logging.
     if os.path.isfile(LOGGING_CONFIG):
-        logging.config.fileConfig(LOGGING_CONFIG, disable_existing_loggers=False)
+        logging.config.fileConfig(LOGGING_CONFIG, disable_existing_loggers=True)
 
     _logger = logging.getLogger(__name__)
 
