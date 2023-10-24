@@ -4,6 +4,8 @@ A Python script that subscribes to kismet emitter detections and outputs them in
 # Install
 ## Raspberry Pi
 
+This project was targeted for a Raspberry Pi platform but should work anywhere kismet does.
+
 Install latest 64-bit Rasperry Pi OS using the sdcard imager (https://www.raspberrypi.com/software/)
 
 ## Kismet 
@@ -35,16 +37,14 @@ Modify the KISMET_HOST if it's not running on the same computer as kismet2cot.
 
 Modify the COT_URL and TAK_PROTO based on where you intend to send the cot. See config.ini file.
 
+Debugging output can be seen on the console where k2c.py is run. To turn that off, simply rename the logging.ini file to something else and restart k2c.py.
+
 # Usage
 Simply run the main script:
 
 >python k2c.py
 
 You can run kismet first or k2c.py first. Doesn't matter.
-
-You can see what's going on under the hood by changing the logging level to INFO or DEBUG:
-
->python k2c.py -log DEBUG
 
 # Design
 A kismet plugin was considered. A c++ version would require binaries to be generated for every possible platform (intel, arm, etc.). A script solution will be more portable. kismet also allows Javascript plugins. But Javascript does not allow TCP connections to be made, which prevents sending out cot on unicast or multicast. NodeJS would work, but there's a decent TAK library for python (PyTAK) that takes care of protobuf, certificates, etc. Not sure if that exists for NodeJS.
@@ -53,10 +53,12 @@ A Python script was determined to be the best solution since it is portable, sim
 
 The PyTAK library (See https://github.com/snstac/pytak) has the CoT side solved, so it was used for sending out CoT. PyTAK also leverages Python's ayncio feature to ensure network data inputs don't get dropped. kismet2cot followed their same architecture to keep things simple and consistent.
 
-kismet has a python-kismet-rest library (See https://github.com/kismetwireless/python-kismet-rest) which handles all the REST API communication, however it does not appear to handle realtime updates, so it was built from scratch.
+kismet has a python-kismet-rest library (See https://github.com/kismetwireless/python-kismet-rest) which handles all the REST API communication, however it does not appear to handle realtime updates, so this part was implemented from scratch.
 
-config.ini also defines where CoT goes (unicast to TAKServer or multicast to all local End User Devices). Modify accordingly.
+config.ini also defines where CoT is sent (unicast to TAKServer or multicast to all local End User Devices). Modify accordingly.
 
-The schema files for CoT are located at https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/tree/master/takcot/xsd
+Which kismet fields should be mapped to which cot fields is a work in progress.
+
+For reference, the schema files for CoT are located at https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/tree/master/takcot/xsd
 
 

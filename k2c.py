@@ -15,7 +15,7 @@ LOGGING_CONFIG="./logging.ini"
 # ======================================================================================
 # Kismet to CoT
 #
-# Subscribe to Kismet device detections, convert them to CoT.
+# Subscribe to Kismet device detections, convert them to CoT and send them out.
 #
 # The kismet login/password and CoT output (TAKServer or EUD) settings are in config.ini
 #

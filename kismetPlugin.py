@@ -14,38 +14,56 @@ import requests
 from requests.auth import HTTPBasicAuth
 from cot import CoT
 
+# ======================================================================================
+# KismetReceiver
+#
+# Follows the pytak QueueWorker pattern from pytak's architecture.
+#
+# Subscribes to kismet webservice to get device detections in real time.
+#
+# Converts kismet detections to CoT and sends them out.
+#
+# See config.ini for configuration settings.
+#
+# 
+#
+# ======================================================================================
 class KismetReceiver(pytak.QueueWorker):
     # Keys and Aliases for the data we want to receive from kismet
     basenameKey="kismet.device.base.name"
     basenameAlias="device.name"
 
-    # This might work when on the move
+    # Untested
     # lastGeopointKey="kismet.device.base.location/kismet.common.location.avg.loc/kismet.common.location.geopoint"
     # lastGeopointAlias="location.geopoint"
 
-    # this often gives 0,0
     lastGeopointKey="kismet.device.base.location/kismet.common.location.last/kismet.common.location.geopoint"
     lastGeopointAlias="location.geopoint"
 
-    # works
     rssiKey="kismet.device.base.signal/kismet.common.signal.last_signal"
     rssiAlias="rssi"
 
-    # works
     altKey="kismet.device.base.location/kismet.common.location.last/kismet.common.location.alt"
     altAlias="alt"
 
-    # works
     manufKey="kismet.device.base.manuf"
     manufAlias="manuf"
 
-    # works
     ssidKey="dot11.device/dot11.device.last_beaconed_ssid_record/dot11.advertisedssid.ssid"
     ssidAlias="ssid"
 
-    # works
     macAddrKey="kismet.device.base.macaddr"
     macAddrAlias="macAddr"
+
+    fields = [ 
+        [basenameKey, basenameAlias],
+        [lastGeopointKey, lastGeopointAlias],
+        [altKey, altAlias],
+        [manufKey, manufAlias],
+        [ssidKey, ssidAlias],
+        [rssiKey, rssiAlias],
+        [macAddrKey, macAddrAlias]
+    ]
 
     # constructor
     def __init__(self, tx_queue, config):
@@ -96,24 +114,13 @@ class KismetReceiver(pytak.QueueWorker):
                 "monitor": "*",
                 "request": 1,
                 "rate": 1,
-                "fields": [ 
-                    [self.basenameKey, self.basenameAlias],
-                    [self.lastGeopointKey, self.lastGeopointAlias],
-                    [self.altKey, self.altAlias],
-                    [self.manufKey, self.manufAlias],
-                    [self.ssidKey, self.ssidAlias],
-                    [self.rssiKey, self.rssiAlias],
-                    [self.macAddrKey, self.macAddrAlias]
-                ]
+                "fields": self.fields
             }
 
             try:
                 # Now request the detections from kismet
                 async with websockets.connect(devicesRequest, extra_headers=myheaders) as websocket:
                     self._logger.info("Connected to kismet.")
-                    # self._logger.debug("open=%s", websocket.open)
-                    # self._logger.debug("request_headers=%s", websocket.request_headers)
-                    # self._logger.debug("response_headers=%s", websocket.response_headers)
 
                     # Send the filtered list of what we want to see
                     await websocket.send(json.dumps(req));
@@ -122,7 +129,7 @@ class KismetReceiver(pytak.QueueWorker):
                     outputRecords = 0
                     async for detection in websocket:
                         inputRecords += 1
-                        self._logger.debug(f"IN (kismet): #{inputRecords}={detection}")
+                        self._logger.debug(f"IN (kismet) #{inputRecords}={detection}")
 
                         xml = await self.kismetToXML(detection)
 
@@ -131,7 +138,7 @@ class KismetReceiver(pytak.QueueWorker):
                             continue
 
                         outputRecords += 1
-                        self._logger.debug(f"OUT (cot): #{outputRecords}={xml}")
+                        self._logger.debug(f"OUT (cot) #{outputRecords}={xml}")
 
                         # Output the cot data into the tx_queue so the TXWorker can pick it up and send it out
                         await self.put_queue(xml)
@@ -147,7 +154,7 @@ class KismetReceiver(pytak.QueueWorker):
                 self._logger.error(f"Connect failed to {devicesRequest}. Retrying...")
                 time.sleep(3)
 
-        # Generate CoT XML
+    # Convert kismet detection into CoT XML
     async def kismetToXML(self, kismetData: str):
         # Deserialize str instance containing a JSON document to a Python object.
         obj: dict = json.loads(kismetData)
