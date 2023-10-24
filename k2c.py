@@ -27,16 +27,16 @@ async def main():
 
     # TODO: --log arg not working yet
     # Look for a --log argument and set the logging level.
-    # argparser = argparse.ArgumentParser()
-    # argparser.add_argument( '-log',
-    #                  '--loglevel',
-    #                  default='warning',
-    #                  help='Provide logging level. Example --loglevel debug, default=warning' )
-    # args = argparser.parse_args()
-    # numeric_level = getattr(logging, args.loglevel.upper(), None)
-    # if not isinstance(numeric_level, int):
-    #     raise ValueError('Invalid log level: %s' % args.loglevel)
-    # _logger.setLevel(numeric_level)
+    argparser = argparse.ArgumentParser()
+    argparser.add_argument( '-log',
+                     '--loglevel',
+                     default='warning',
+                     help='Provide logging level. Example --loglevel debug, default=warning' )
+    args = argparser.parse_args()
+    numeric_level = getattr(logging, args.loglevel.upper(), None)
+    if not isinstance(numeric_level, int):
+        raise ValueError('Invalid log level: %s' % args.loglevel)
+    logging.getLogger().setLevel(numeric_level)
 
     # config.ini contains configuration settings
     parser = ConfigParser()

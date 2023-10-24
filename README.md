@@ -37,7 +37,7 @@ Modify the KISMET_HOST if it's not running on the same computer as kismet2cot.
 
 Modify the COT_URL and TAK_PROTO based on where you intend to send the cot. See config.ini file.
 
-Debugging output can be seen on the console where k2c.py is run. To turn that off, simply rename the logging.ini file to something else and restart k2c.py.
+Debugging output is seen on the console and logged to a file called debug.log in the directory where k2c.py is run. To turn that off, simply rename the logging.ini file to something else and restart k2c.py.
 
 # Usage
 Simply run the main script:
@@ -45,6 +45,10 @@ Simply run the main script:
 >python k2c.py
 
 You can run kismet first or k2c.py first. Doesn't matter.
+
+To view debugging output on the console, pass in -log=debug like so:
+
+>python k2c.py -log=debug
 
 # Design
 A kismet plugin was considered. A c++ version would require binaries to be generated for every possible platform (intel, arm, etc.). A script solution will be more portable. kismet also allows Javascript plugins. But Javascript does not allow TCP connections to be made, which prevents sending out cot on unicast or multicast. NodeJS would work, but there's a decent TAK library for python (PyTAK) that takes care of protobuf, certificates, etc. Not sure if that exists for NodeJS.

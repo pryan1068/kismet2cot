@@ -4,15 +4,12 @@ import xml.etree.ElementTree as ET
 
 # pytak imports
 import pytak
-from takproto.proto import TakMessage
-from takproto import format_time
 
 # kismet imports
 import websockets
 import json
 import requests
 from requests.auth import HTTPBasicAuth
-from cot import CoT
 
 # ======================================================================================
 # KismetReceiver
@@ -68,10 +65,9 @@ class KismetReceiver(pytak.QueueWorker):
     # constructor
     def __init__(self, tx_queue, config):
         super().__init__(tx_queue, config)
-        self._logger = logging.getLogger(__name__)
 
     async def run(self):
-        self._logger.debug("Kismet: logging in...")
+        logging.debug("Kismet: logging in...")
         # Future: Consider using aiohttp to speed up connecting to kismet if it does basic auth.
 
         # Authenticate with kismet
@@ -92,12 +88,12 @@ class KismetReceiver(pytak.QueueWorker):
                     response = requests.get(url, auth=basic)
 
                 except Exception as e:
-                    self._logger.error(f"Connect failed to kismet {url}. IS IT RUNNING? Retrying...")
+                    logging.error(f"Connect failed to kismet {url}. IS IT RUNNING? Retrying...")
                     time.sleep(3)
 
             # Use the kismet cookie for subsequent requests
             kismetCookie = self.get('KISMET', response.cookies, 'INVALID KEY')
-            # self._logger.debug("KISMET=%s", kismetCookie)
+            # logging.debug("KISMET=%s", kismetCookie)
 
             myheaders = {
                 "Cookie":f"KISMET={kismetCookie}"
@@ -120,7 +116,7 @@ class KismetReceiver(pytak.QueueWorker):
             try:
                 # Now request the detections from kismet
                 async with websockets.connect(devicesRequest, extra_headers=myheaders) as websocket:
-                    self._logger.info("Connected to kismet.")
+                    logging.info("Connected to kismet.")
 
                     # Send the filtered list of what we want to see
                     await websocket.send(json.dumps(req));
@@ -129,29 +125,29 @@ class KismetReceiver(pytak.QueueWorker):
                     outputRecords = 0
                     async for detection in websocket:
                         inputRecords += 1
-                        self._logger.debug(f"IN (kismet) #{inputRecords}={detection}")
+                        logging.debug(f"IN (kismet) #{inputRecords}={detection}")
 
                         xml = await self.kismetToXML(detection)
 
                         if not xml:
-                            # self._logger.debug("xml is empty.")
+                            # logging.debug("xml is empty.")
                             continue
 
                         outputRecords += 1
-                        self._logger.debug(f"OUT (cot) #{outputRecords}={xml}")
+                        logging.debug(f"OUT (cot) #{outputRecords}={xml}")
 
                         # Output the cot data into the tx_queue so the TXWorker can pick it up and send it out
                         await self.put_queue(xml)
             except websockets.exceptions.InvalidStatusCode as code:
-                self._logger.error('code={code.status_code}')
+                logging.error('code={code.status_code}')
                 if code.status_code == 401:
-                    self._logger.fatal("======================================================================================")
-                    self._logger.fatal(f"Verify username({KISMET_USER}) and password({KISMET_PASSWORD}) are matching in kismet")
-                    self._logger.fatal("======================================================================================")
+                    logging.fatal("======================================================================================")
+                    logging.fatal(f"Verify username({KISMET_USER}) and password({KISMET_PASSWORD}) are matching in kismet")
+                    logging.fatal("======================================================================================")
                     exit(1)
             except Exception as e:
                 print(e)
-                self._logger.error(f"Connect failed to {devicesRequest}. Retrying...")
+                logging.error(f"Connect failed to {devicesRequest}. Retrying...")
                 time.sleep(3)
 
     # Convert kismet detection into CoT XML
@@ -210,7 +206,7 @@ class KismetReceiver(pytak.QueueWorker):
 
             xml = ET.tostring(event)
         except Exception as e:
-            self._logger.debug(f"{e}")
+            logging.debug(f"{e}")
 
         return xml
 
