@@ -1,8 +1,11 @@
 import time
 import logging
+import xml.etree.ElementTree as ET
 
 # pytak imports
 import pytak
+from takproto.proto import TakMessage
+from takproto import format_time
 
 # kismet imports
 import websockets
@@ -76,7 +79,7 @@ class KismetReceiver(pytak.QueueWorker):
 
             # Use the kismet cookie for subsequent requests
             kismetCookie = self.get('KISMET', response.cookies, 'INVALID KEY')
-            self._logger.debug("KISMET=%s", kismetCookie)
+            # self._logger.debug("KISMET=%s", kismetCookie)
 
             myheaders = {
                 "Cookie":f"KISMET={kismetCookie}"
@@ -108,9 +111,9 @@ class KismetReceiver(pytak.QueueWorker):
                 # Now request the detections from kismet
                 async with websockets.connect(devicesRequest, extra_headers=myheaders) as websocket:
                     self._logger.info("Connected to kismet.")
-                    self._logger.debug("open=%s", websocket.open)
-                    self._logger.debug("request_headers=%s", websocket.request_headers)
-                    self._logger.debug("response_headers=%s", websocket.response_headers)
+                    # self._logger.debug("open=%s", websocket.open)
+                    # self._logger.debug("request_headers=%s", websocket.request_headers)
+                    # self._logger.debug("response_headers=%s", websocket.response_headers)
 
                     # Send the filtered list of what we want to see
                     await websocket.send(json.dumps(req));
@@ -119,25 +122,16 @@ class KismetReceiver(pytak.QueueWorker):
                     outputRecords = 0
                     async for detection in websocket:
                         inputRecords += 1
-                        self._logger.debug(f"kismet #{inputRecords}={detection}")
+                        self._logger.debug(f"IN (kismet): #{inputRecords}={detection}")
 
-                        # convert the kismet data into cot
-                        cot = CoT()
-                        await self.kismet2cot(detection, cot)
-
-                        self._logger.debug("cot=%s", cot.toString())
-                        if cot.isValid() == False:
-                            self._logger.debug("Invalid cot generated from kismet - skipping")
-                            continue
-
-                        # Convert the cot data into xml so pytak can send it out
-                        xml = cot.toXML()
-                        outputRecords += 1
-                        self._logger.debug(f"xml #{outputRecords}={xml}")
+                        xml = await self.kismetToXML(detection)
 
                         if not xml:
-                            self._logger.debug("xml is empty.")
+                            # self._logger.debug("xml is empty.")
                             continue
+
+                        outputRecords += 1
+                        self._logger.debug(f"OUT (cot): #{outputRecords}={xml}")
 
                         # Output the cot data into the tx_queue so the TXWorker can pick it up and send it out
                         await self.put_queue(xml)
@@ -153,22 +147,22 @@ class KismetReceiver(pytak.QueueWorker):
                 self._logger.error(f"Connect failed to {devicesRequest}. Retrying...")
                 time.sleep(3)
 
-    async def kismet2cot(self, data: str, cot: CoT=CoT()):
+        # Generate CoT XML
+    async def kismetToXML(self, kismetData: str):
         # Deserialize str instance containing a JSON document to a Python object.
-        obj: dict = json.loads(data)
+        obj: dict = json.loads(kismetData)
 
         name=self.get(self.basenameAlias, obj, "UNK")
-        lat=0.0
-        lon=0.0
+        lat="-0.0"
+        lon="-0.0"
 
         if self.lastGeopointAlias in obj:
             geopoint = obj[self.lastGeopointAlias]
             if geopoint==None or geopoint==0:
-                lat = 0.0
-                lon = 0.0
+                return None
             else:
-                lat = float(geopoint[1])
-                lon = float(geopoint[0])
+                lat = str(geopoint[1])
+                lon = str(geopoint[0])
 
         alt=self.get(self.altAlias, obj, "0")
         # heading=self.get(headingAlias, obj, "0")
@@ -176,19 +170,42 @@ class KismetReceiver(pytak.QueueWorker):
         ssid=self.get(self.ssidAlias, obj, "UNK")
         rssi=self.get(self.rssiAlias, obj, "0")
         macAddr=self.get(self.macAddrAlias, obj, "0")
+        hae="0"
+        le="999999"
+        ce="999999"
+        xmlDetail = "Manf=" + manf + " SSID=" + ssid + " RSSI=" + rssi + " MAC=" + macAddr + " Alt=" + alt
 
-        # Populate the CoT event
-        cot.setType("a-u-G")
-        cot.setUid(name)
-        cot.setTime(cot.cot_time())
-        cot.setStart(cot.cot_time())
-        cot.setStale(cot.cot_time(3600))
-        cot.setLat(lat)
-        cot.setLon(lon)
-        detail = "Manf=" + manf + " SSID=" + ssid + " RSSI=" + rssi + " MAC=" + macAddr + " Alt=" + alt
-        cot.setDetail(detail)
+        xml = None
 
-        return cot
+        try:
+            event = ET.Element("event")
+            event.set("version", "2.0")
+            event.set("type", "a-u-G")
+            event.set("uid", name)
+            event.set("how", "m-g")
+            event.set("time", pytak.cot_time())
+            event.set("start", pytak.cot_time())
+            event.set("stale", pytak.cot_time(3600))
+            
+            pt_attr = {
+                "lat": lat,
+                "lon": lon,
+                "hae": hae,
+                "ce": ce,
+                "le": le,
+            }
+
+            ET.SubElement(event, "point", attrib=pt_attr)
+
+            detail = ET.SubElement(event, "detail")
+            remarks = ET.SubElement(detail, "remarks")
+            remarks.text = xmlDetail
+
+            xml = ET.tostring(event)
+        except Exception as e:
+            self._logger.debug(f"{e}")
+
+        return xml
 
     # If the key is in the obj, return the value. Otherwise, return the default.
     # Ensure the value returned is always a string.
@@ -206,4 +223,80 @@ class KismetReceiver(pytak.QueueWorker):
 
         # print("return=", value)
         return value
+
+    # async def kismet2TakMessage(self, kismetData: str):
+    #         # Deserialize str instance containing a JSON document to a Python object.
+    #         obj: dict = json.loads(kismetData)
+
+    #         name=self.get(self.basenameAlias, obj, "UNK")
+    #         lat=0.0
+    #         lon=0.0
+
+    #         if self.lastGeopointAlias in obj:
+    #             geopoint = obj[self.lastGeopointAlias]
+    #             if geopoint==None or geopoint==0:
+    #                 lat = 0.0
+    #                 lon = 0.0
+    #             else:
+    #                 lat = float(geopoint[1])
+    #                 lon = float(geopoint[0])
+
+    #         alt=self.get(self.altAlias, obj, "0")
+    #         # heading=self.get(headingAlias, obj, "0")
+    #         manf=self.get(self.manufAlias, obj, "UNK")
+    #         ssid=self.get(self.ssidAlias, obj, "UNK")
+    #         rssi=self.get(self.rssiAlias, obj, "0")
+    #         macAddr=self.get(self.macAddrAlias, obj, "0")
+
+    #         # Populate the CoT event
+    #         tak_message = TakMessage()
+
+    #         setattr(tak_message.cotEvent, "type", "a-u-G")
+    #         setattr(tak_message.cotEvent, "uid", name)
+    #         setattr(tak_message.cotEvent, "sendTime", format_time(pytak.cot_time()))
+    #         setattr(tak_message.cotEvent, "startTime", format_time(pytak.cot_time()))
+    #         setattr(tak_message.cotEvent, "staleTime", format_time(pytak.cot_time(3600)))
+    #         setattr(tak_message.cotEvent, "lat", lat)
+    #         setattr(tak_message.cotEvent, "lon", lon)
+    #         tak_message.cotEvent.detail.xmlDetail = "Manf=" + manf + " SSID=" + ssid + " RSSI=" + rssi + " MAC=" + macAddr + " Alt=" + alt
+
+    #         return tak_message
+    
+
+    # async def kismet2cot(self, data: str, cot: CoT=CoT()):
+    #     # Deserialize str instance containing a JSON document to a Python object.
+    #     obj: dict = json.loads(data)
+
+    #     name=self.get(self.basenameAlias, obj, "UNK")
+    #     lat=0.0
+    #     lon=0.0
+
+    #     if self.lastGeopointAlias in obj:
+    #         geopoint = obj[self.lastGeopointAlias]
+    #         if geopoint==None or geopoint==0:
+    #             lat = 0.0
+    #             lon = 0.0
+    #         else:
+    #             lat = float(geopoint[1])
+    #             lon = float(geopoint[0])
+
+    #     alt=self.get(self.altAlias, obj, "0")
+    #     # heading=self.get(headingAlias, obj, "0")
+    #     manf=self.get(self.manufAlias, obj, "UNK")
+    #     ssid=self.get(self.ssidAlias, obj, "UNK")
+    #     rssi=self.get(self.rssiAlias, obj, "-0")
+    #     macAddr=self.get(self.macAddrAlias, obj, "-0")
+
+    #     # Populate the CoT event
+    #     cot.setType("a-u-G")
+    #     cot.setUid(name)
+    #     cot.setTime(cot.cot_time())
+    #     cot.setStart(cot.cot_time())
+    #     cot.setStale(cot.cot_time(3600))
+    #     cot.setLat(lat)
+    #     cot.setLon(lon)
+    #     detail = "Manf=" + manf + " SSID=" + ssid + " RSSI=" + rssi + " MAC=" + macAddr + " Alt=" + alt
+    #     cot.setDetail(detail)
+
+    #     return cot
 

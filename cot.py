@@ -30,6 +30,8 @@ from takproto.constants import (
 #     TakMessage is the primary internal format, but not exposed to the user
 #     TakMessage was used because it handles the protobuf serialization/deserialization
 #     Getters/Setters provided to encapsulate internal implementation
+#     Default values are provided for all fields
+#     All time fields are stored internally as UTC datetime instances
 #
 #===============================================================================
 
@@ -37,10 +39,16 @@ class CoT:
     ISO_8601_UTC = "%Y-%m-%dT%H:%M:%S.%fZ"
     
     # Constructor. Pass in a bytearray to parse, or pass in the desired values.
-    def __init__(self, pb: bytearray=None, type=None, uid=None, how=None, time=None, start=None, stale=None, lat=None, lon=None, hae=None, ce=None, le=None, detail=None, access=None, opex=None, qos=None, callsign=None):
+    # TODO what are the preferred Types for datetime args passed in? str or datetime?
+    def __init__(self, pb: bytearray=None, type: str=None, uid: str=None, how: str=None, time=None, start=None, stale=None, lat: float=None, lon: float=None, hae: float=None, ce: float=None, le: float=None, detail: str=None, access: str=None, opex: str=None, qos: str=None, callsign: str=None):
         self._logger = logging.getLogger(__name__)
 
         self.tak_message = TakMessage()
+
+        # default state time is 60 minutes
+        self.staleOffsetInMinutes = 60
+        
+        self.setDefaultValues()
 
         if pb:
             self.fromProtobuf(pb)
@@ -92,7 +100,23 @@ class CoT:
         
         # if callsign:
         #     self.setCallsign(callsign)
-        
+    def setDefaultValues(self):
+        self.setType("a-u")
+        self.setUid("default")
+        self.setHow("m-c")
+        self.setTime(datetime.now(timezone.utc))
+        self.setStart(datetime.now(timezone.utc))
+        self.setStale(self.getStart() + timedelta(seconds=self.staleOffsetInMinutes))
+        self.setLat(0)
+        self.setLon(0)
+        self.setHae(0)
+        self.setCe(9999999.0)
+        self.setLe(9999999.0)
+        self.setDetail("")
+        self.setAccess("true")
+        self.setOpex("false")
+        self.setQos("0")
+        self.setRemarks("")
     
     def isValid(self):
         rc = True
@@ -147,7 +171,7 @@ class CoT:
     
     def setTime(self, time=None):
         if time == None:
-            time = self.cot_time()
+            self.time = datetime.now(timezone.utc)
             
         setattr(self.tak_message.cotEvent, "sendTime", self.toMicroseconds(time))
     
@@ -156,7 +180,7 @@ class CoT:
     
     def setStart(self, start=None):
         if start == None:
-            start = self.cot_time()
+            self.start = self.cot_time()
             
         setattr(self.tak_message.cotEvent, "startTime", self.toMicroseconds(start))
     
@@ -169,6 +193,7 @@ class CoT:
             stale = self.cot_time(stale)
             
         setattr(self.tak_message.cotEvent, "staleTime", self.toMicroseconds(stale))
+        self.setStale()
     
     def getLat(self):
         return getattr(self.tak_message.cotEvent, "lat")

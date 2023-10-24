@@ -57,5 +57,6 @@ kismet has a python-kismet-rest library (See https://github.com/kismetwireless/p
 
 config.ini also defines where CoT goes (unicast to TAKServer or multicast to all local End User Devices). Modify accordingly.
 
+The schema files for CoT are located at https://github.com/deptofdefense/AndroidTacticalAssaultKit-CIV/tree/master/takcot/xsd
 
 

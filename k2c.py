@@ -2,14 +2,13 @@
 
 import asyncio
 import pytak
+import os
 import os.path
 import logging.config
 import argparse
 import logging
 from configparser import ConfigParser
 from kismetPlugin import KismetReceiver
-
-import os
 
 LOGGING_CONFIG="./logging.ini"
 
@@ -25,8 +24,6 @@ async def main():
     # If there's a logging.ini file, use it to configure logging.
     if os.path.isfile(LOGGING_CONFIG):
         logging.config.fileConfig(LOGGING_CONFIG, disable_existing_loggers=True)
-
-    _logger = logging.getLogger(__name__)
 
     # TODO: --log arg not working yet
     # Look for a --log argument and set the logging level.
