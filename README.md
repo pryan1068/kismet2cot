@@ -57,6 +57,8 @@ A Python script was determined to be the best solution since it is portable, sim
 
 The PyTAK library (See https://github.com/snstac/pytak) has the CoT side solved, so it was used for sending out CoT. PyTAK also leverages Python's ayncio feature to ensure network data inputs don't get dropped. kismet2cot followed their same architecture to keep things simple and consistent.
 
+![kismet2cot System Diagram](./images/kismet2cot.png)
+
 kismet has a python-kismet-rest library (See https://github.com/kismetwireless/python-kismet-rest) which handles all the REST API communication, however it does not appear to handle realtime updates, so this part was implemented from scratch.
 
 config.ini also defines where CoT is sent (unicast to TAKServer or multicast to all local End User Devices). Modify accordingly.
