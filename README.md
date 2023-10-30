@@ -55,7 +55,7 @@ A kismet plugin was considered. A c++ version would require binaries to be gener
 
 A Python script was determined to be the best solution since it is portable, simple, field extensible and can work transparently behind the scenes once installed.
 
-The PyTAK library (See https://github.com/snstac/pytak) has the CoT side solved, so it was used for sending out CoT. PyTAK also leverages Python's ayncio feature to ensure network data inputs don't get dropped. kismet2cot followed their same architecture to keep things simple and consistent.
+The PyTAK library (See https://github.com/snstac/pytak) has the CoT side solved, so it was used for sending out CoT. PyTAK also leverages Python's asyncio feature to ensure network data inputs don't get dropped. kismet2cot followed their same architecture to keep things simple and consistent.
 
 ![kismet2cot System Diagram](./images/kismet2cot.png)
 
