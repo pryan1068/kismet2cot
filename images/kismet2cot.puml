@@ -1,0 +1,28 @@
+@startuml kismet2cot
+
+file  kismet #palegreen;line:green;line.dashed;text:green {
+usecase "kismet" as kismetdaemon
+usecase "kismet-ws" as kismetws
+kismetdaemon --> kismetws 
+}
+
+file  "k2c           " #palegreen;line:green;line.dashed;text:green {
+usecase "KismetReceiver" as kismetreceiver
+rectangle "tx_queue" as tx_queue
+usecase "TXWorker" as txworker
+kismetreceiver --> tx_queue : " CoT XML"
+tx_queue --> txworker
+}
+
+usecase "Multicast Network" as mcnetwork
+usecase "EUD" as eud
+usecase "Unicast Network" as uninetwork
+usecase "TAK Server" as takserver
+
+kismetws --> kismetreceiver : " Emitter Detections"
+txworker --> mcnetwork : " CoT Protobuf"
+txworker --> uninetwork : " CoT Protobuf"
+mcnetwork --> eud : " CoT Protobuf"
+uninetwork --> takserver : " CoT Protobuf"
+
+@enduml
